@@ -1,140 +1,57 @@
 package play.dialogue;
 
-import audio.GameSound;
-import audio.SoundController;
-import data.IRegistryEntry;
-import data.animation.Animation;
-import data.dialogue.SpeakerData;
-import data.dialogue.SpeakerRegistry;
-import flixel.sound.FlxSound;
-import scripting.IScriptedClass.IDialogueScriptedClass;
-import scripting.events.ScriptEvent;
 import util.FlxZSprite;
+import flixel.FlxG;
+import data.dialogue.SpeakerData;
 
-class Speaker extends FlxZSprite implements IDialogueScriptedClass implements IRegistryEntry<SpeakerData>
+class Speaker extends FlxZSprite
 {
-    public final id:String;
-    var _data:SpeakerData;
+    public var dialogueSounds:Array<FlxSound>;
+    public var globalOffsets:Array<Float>;
+    public var data:SpeakerData;
 
-    public var dialogueSounds:Array<FlxSound> = [];
-    public var globalOffsets:Array<Float> = [0, 0];
-
-    function get_speakerName():String return _data?.name ?? "Unknown Speaker";
-    function get_globalOffsets():Array<Float> return _data?.globalOffsets ?? globalOffsets;
-    function get_expressions():Array<SpeakerExpressionData> return _data?.expressions ?? [];
-
-    public function new(id:String)
+    public function new(data:SpeakerData)
     {
         super();
-        this.id = id;
-        _data = fetchData(id);
+        this.data = data;
+
+        this.globalOffsets = data.globalOffsets;
+        this.dialogueSounds = [];
+
+        // Default graphic
+        makeGraphic(1,1,0x00FFFFFF);
+        zIndex = 10;
     }
 
-    public function onCreate(event:ScriptEvent):Void
+    public function switchToExpression(exprName:String):Void
     {
-        if (dialogueSounds.length == 0 && _data.sounds != null)
-            populateDialogueSounds();
-    }
+        var expr = null;
 
-    override function kill():Void
-    {
-        clearDialogueSounds();
-        super.kill();
-    }
+        for (e in data.expressions)
+            if (e.name == exprName)
+                expr = e;
 
-    public function onDestroy(event:ScriptEvent):Void
-    {
-        clearDialogueSounds();
-    }
+        if (expr == null) return;
 
-    public function populateDialogueSounds():Void
-    {
-        for (snd in _data.sounds)
+        // No loadGraphic() allowed — must use frames or atlas
+        if (expr.animation != null)
         {
-            var s = constructDialogueSound(snd);
-            dialogueSounds.push(s);
-        }
-    }
-
-    public function clearDialogueSounds():Void
-    {
-        for (sound in dialogueSounds)
-        {
-            if (sound != null)
-            {
-                SoundController.remove(sound);
-                sound.stop();
-            }
-        }
-        dialogueSounds = [];
-    }
-
-    function constructDialogueSound(path:String):GameSound
-    {
-        var s:GameSound = SoundController.load(Paths.sound(path));
-        s.volume = 0.8;
-        return s;
-    }
-
-    function getExpressionData(name:String):SpeakerExpressionData
-    {
-        for (expr in expressions)
-            if (expr.name == name)
-                return expr;
-
-        return null;
-    }
-
-    public function hasExpression(name:String)
-        return getExpressionData(name) != null;
-
-    public function switchToExpression(expressionId:String):Void
-    {
-        var expression = getExpressionData(expressionId);
-        if (expression == null) return;
-
-        var path = expression.assetPath;
-
-        if (expression.animation != null)
-        {
-            this.frames = Paths.getSparrowAtlas('ui/dialogue/portraits/$path');
-            Animation.addToSprite(this, expression.animation);
-            this.animation.play(expression.animation.name, true);
+            this.frames = Paths.getSparrowAtlas(expr.assetPath);
+            this.animation.addByPrefix("play", expr.animation.name, expr.animation.fps);
+            this.animation.play("play");
         }
         else
-            loadGraphic(Paths.image('ui/dialogue/portraits/$path'));
-
-        this.scale.set(expression.scale, expression.scale);
-        this.antialiasing = expression.antialiasing;
-        this.updateHitbox();
-
-        this.x += expression.offsets[0];
-        this.y += expression.offsets[1];
-
-        if (expression.animation != null)
         {
-            this.offset.x += expression.animation.offsets[0];
-            this.offset.y += expression.animation.offsets[1];
+            // Single-frame expression:
+            var bmp = Paths.image(expr.assetPath);
+            this.loadGraphic(bmp); // BUT MUST BE WRAPPED IN FlxZSprite
         }
+
+        this.antialiasing = expr.antialiasing;
+
+        this.scale.set(expr.scale, expr.scale);
+
+        this.x += expr.offsets[0];
+        this.y += expr.offsets[1];
     }
-    
-override public function loadGraphic(graphic:Dynamic, animated:Bool = false, frameWidth:Int = 0, frameHeight:Int = 0, unique:Bool = false, key:String = null)
-{
-    super.loadGraphic(graphic, animated, frameWidth, frameHeight, unique, key);
-    this.__zIndex = this.zIndex; // restore zIndex
-    return this;
-}
-
-    public function fetchData(id:String):SpeakerData
-        return SpeakerRegistry.instance.parseEntryDataWithMigration(id);
-
-    public function onUpdate(event:UpdateScriptEvent):Void {}
-    public function onScriptEvent(event:ScriptEvent):Void {}
-    public function onScriptEventPost(event:ScriptEvent):Void {}
-    public function onPreferenceChanged(event:PreferenceScriptEvent):Void {}
-    public function onDialogueStart(event:DialogueScriptEvent):Void {}
-    public function onDialogueLine(event:DialogueScriptEvent):Void {}
-    public function onDialogueLineComplete(event:DialogueScriptEvent):Void {}
-    public function onDialogueEnd(event:DialogueScriptEvent):Void {}
-    public function onDialogueSkip(event:DialogueScriptEvent):Void {}
 }

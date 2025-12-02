@@ -1,8 +1,10 @@
 package play.dialogue;
 
 import util.FlxZSprite;
-import flixel.FlxG;
 import data.dialogue.SpeakerData;
+import flixel.FlxG;
+import flixel.graphics.frames.FlxAtlasFrames;
+import openfl.display.BitmapData;
 
 class Speaker extends FlxZSprite
 {
@@ -18,39 +20,76 @@ class Speaker extends FlxZSprite
         this.globalOffsets = data.globalOffsets;
         this.dialogueSounds = [];
 
-        // Default graphic
-        makeGraphic(1,1,0x00FFFFFF);
+        // Prepare a harmless default 1x1 graphic
+        makeGraphic(1, 1, 0x00FFFFFF);
         zIndex = 10;
     }
 
     public function switchToExpression(exprName:String):Void
     {
-        var expr = null;
+        var expr:SpeakerExpressionData = null;
 
         for (e in data.expressions)
             if (e.name == exprName)
                 expr = e;
 
-        if (expr == null) return;
+        if (expr == null)
+            return;
 
-        // No loadGraphic() allowed — must use frames or atlas
+        // RESET PREVIOUS VISUALS (required!)
+        this.animation.destroyAnimations();
+        this.frames = null;
+
+        // ============================================================
+        //  1. ATLAS / MULTI-FRAME ANIMATION
+        // ============================================================
         if (expr.animation != null)
         {
-            this.frames = Paths.getSparrowAtlas(expr.assetPath);
-            this.animation.addByPrefix("play", expr.animation.name, expr.animation.fps);
-            this.animation.play("play");
+            var atlas:FlxAtlasFrames = Paths.getSparrowAtlas(expr.assetPath);
+
+            if (atlas != null)
+            {
+                this.frames = atlas;
+                this.antialiasing = expr.antialiasing;
+                this.animation.addByPrefix(
+                    "play",
+                    expr.animation.name,
+                    expr.animation.fps
+                );
+                this.animation.play("play");
+            }
         }
         else
         {
-            // Single-frame expression:
-            var bmp = Paths.image(expr.assetPath);
-            this.loadGraphic(bmp); // BUT MUST BE WRAPPED IN FlxZSprite
+            // ========================================================
+            //  2. SINGLE PNG EXPRESSION — **NO loadGraphic EVER**
+            // ========================================================
+
+            var bmp:BitmapData = Paths.image(expr.assetPath);
+            if (bmp != null)
+            {
+                // Make an identical-size blank canvas
+                makeGraphic(bmp.width, bmp.height, 0x00000000);
+
+                // Copy image pixels into FlxZSprite bitmap
+                this.pixels.copyPixels(
+                    bmp,
+                    bmp.rect,
+                    bmp.rect.topLeft
+                );
+
+                this.dirty = true; // refresh render
+                this.updateHitbox();
+            }
         }
 
+        // ================================================================
+        //  Apply expression metadata (scale, AA, offsets)
+        // ================================================================
         this.antialiasing = expr.antialiasing;
-
         this.scale.set(expr.scale, expr.scale);
 
+        // Offset adjustments
         this.x += expr.offsets[0];
         this.y += expr.offsets[1];
     }

@@ -1,0 +1,70 @@
+name: Mobile-iOS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+jobs:
+  Build-iOS:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Version
+        id: ver
+        shell: bash
+        run: |
+          if git describe --tags --exact-match >/dev/null 2>&1; then
+            echo "version=$(git describe --tags --exact-match)" >> $GITHUB_OUTPUT
+          else
+            echo "version=dev-$(date +'%Y%m%d-%H%M')" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: krdlab/setup-haxe@master
+        with:
+          haxe-version: 4.3.6
+
+      - name: Install Haxelibs
+        run: |
+          haxelib install hxcpp
+          haxelib install lime
+          haxelib install openfl
+          haxelib install flixel
+          haxelib install flixel-ui
+          haxelib install flixel-addons
+          haxelib install flxanimate
+          haxelib install json2object
+          haxelib install polymod
+          haxelib install hscript
+          haxelib install hxvlc
+          haxelib git discord_rpc https://github.com/Aidan63/linc_discord-rpc
+          haxelib install hmm
+          haxelib run hmm install
+
+      - name: Build iOS (nosign)
+        run: haxelib run lime build ios -nosign -D officialBuild -DMOBILE_BUILD
+
+      - name: Package IPA
+        run: |
+          cd export/release/ios/build/*-iphoneos
+          mkdir Payload
+          mv *.app Payload/
+          zip -r ~/ios-${{ steps.ver.outputs.version }}.ipa Payload
+
+      - name: Collect IPA
+        run: |
+          mkdir build
+          mv ~/ios-${{ steps.ver.outputs.version }}.ipa build/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: build/*

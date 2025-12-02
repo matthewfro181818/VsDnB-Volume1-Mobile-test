@@ -222,25 +222,33 @@ class Dialogue extends FlxSpriteGroup implements IDialogueScriptedClass implemen
     // -------------------------
     //  TEXT
     // -------------------------
-    function buildText():Void
-    {
-        textHolder = new FlxZSprite();
-        textHolder.zIndex = 30;
-        add(textHolder);
+function buildText():Void
+{
+    // Holder group with Z-index support
+    textHolder = new FlxZGroup();
+    textHolder.zIndex = 30;
+    add(textHolder);
 
-        textWrapper = new FlxZSprite();
-        textWrapper.zIndex = 31;
+    // Inner wrapper group (also Z-index safe)
+    textWrapper = new FlxZGroup();
+    textWrapper.zIndex = 31;
+    textHolder.add(textWrapper);
 
-        textHolder.add(textWrapper);
+    // The text object
+    dialogueText = new FlxTypeText(
+        140, 425,
+        Std.int(FlxG.width * 0.8),
+        "", 32
+    );
 
-        dialogueText = new FlxTypeText(140, 425, Std.int(FlxG.width * 0.8), "", 32);
-        dialogueText.font = Paths.font("comic.ttf");
-        dialogueText.color = 0xFF000000;
-        dialogueText.antialiasing = true;
-        dialogueText.completeCallback = onTypingComplete;
+    dialogueText.font = Paths.font("comic.ttf");
+    dialogueText.color = 0xFF000000;
+    dialogueText.antialiasing = true;
+    dialogueText.completeCallback = onTypingComplete;
 
-        textWrapper.add(dialogueText);
-    }
+    // Add inside wrapper
+    textWrapper.add(dialogueText);
+}
 
     // -------------------------
     //  BEGIN DIALOGUE
